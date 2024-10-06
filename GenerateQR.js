@@ -235,7 +235,7 @@ const App = () => {
       address: address || null
     });
     
-
+    console.log('Address', address);
     const {encryptedData, salt} = encryptData(qrData, secretKey);
 
     const hmacSignature = generateHMACSignature(qrData, secretKey);

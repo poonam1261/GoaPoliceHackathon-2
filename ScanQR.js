@@ -190,31 +190,31 @@ const AppPro = () => {
 
           {/* Conditional rendering based on pass validity */}
           <View style={styles.cardRow}>
-            <Text style={styles.label}>Mobile Number:</Text>
+            <Text style={styles.label}>Mobile Number: </Text>
             <Text style={styles.value}>{qrData?.mobileNumber || 'N/A'}</Text>
           </View>
           <View style={styles.cardRow}>
-            <Text style={styles.label}>Car Number:</Text>
+            <Text style={styles.label}>Car Number: </Text>
             <Text style={styles.value}>{qrData?.carNumber || 'N/A'}</Text>
           </View>
           <View style={styles.cardRow}>
-            <Text style={styles.label}>Violation:</Text>
+            <Text style={styles.label}>Violation: </Text>
             <Text style={styles.value}>{qrData?.violation || 'N/A'}</Text>
           </View>
           <View style={styles.cardRow}>
-          <Text style={styles.label}>Location:</Text>
+          <Text style={styles.label}>Location: </Text>
             <Text style={styles.value}>{qrData?.address || 'N/A'}</Text>
           </View>
           
 
           {/* Display the "Issued By" field */}
           <View style={styles.cardRow}>
-            <Text style={styles.label}>Issued By:</Text>
+            <Text style={styles.label}>Issued By: </Text>
             <Text style={styles.value}>{qrData?.issuedBy || 'N/A'}</Text>
           </View>
 
           <View style={styles.cardRow}>
-            <Text style={styles.label}>Valid Until:</Text>
+            <Text style={styles.label}>Valid Until: </Text>
             <Text style={styles.value}> 
               {qrData?.validUntil
                 ? moment(qrData.validUntil).format('YYYY-MM-DD HH:mm:ss')
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
   },
   cardRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     width: '100%',
     marginBottom: 10,
   },

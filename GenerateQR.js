@@ -122,7 +122,6 @@ const App = () => {
       Alert.alert('Error', 'Failed to capture QR code.');
     }
 
-    sendSMS(qrCodeUri);
   
 };
 
@@ -160,15 +159,15 @@ const App = () => {
         });
     
         const { latitude, longitude } = currentLocation.coords;
-        setLocation({ latitude}, {longitude });
+        setLocation({ latitude, longitude });  // Correctly set both latitude and longitude
         console.log('Location: ', currentLocation);
     
         // Reverse geocoding
         const place = await Location.reverseGeocodeAsync({ latitude, longitude });
         if (place.length > 0) {
-          setAddress(`${place[0].name}, ${place[0].city}, ${place[0].region}`); // Adjust as needed
-          setLocation({ latitude}, {longitude });
-          console.log('address', address);
+          const formattedAddress = `${place[0].name}, ${place[0].city}, ${place[0].region}`;
+          setAddress(formattedAddress);  // Set the address in state
+          console.log('address', formattedAddress);
         } else {
           setAddress('Unknown Location');
         }
@@ -177,6 +176,7 @@ const App = () => {
         setLocation(null);
       }
     };
+    
     
 
     const checkLocationServices = async () => {
@@ -217,6 +217,15 @@ const App = () => {
       return;
     }
 
+    if (!address) {
+      try {
+        await requestLocationPermission();  // Wait until the location is fetched
+      } catch (error) {
+        Alert.alert('Error', 'Unable to fetch location. Please try again.');
+        return;  // Exit if location fetch fails
+      }
+    }
+
     // Ensure the username is fetched before generating the pass
     await fetchUserName(); // Ensure username is fetched before pass generation
     
@@ -229,10 +238,10 @@ const App = () => {
       mobileNumber,
       carNumber,
       violation,
-      validUntil: expirationTime.toISOString(), // This is crucial
+      validUntil: expirationTime.toISOString(),
       dateOfIssue: dateOfIssue,
       issuedBy: issuedBy || null,
-      address: address || null
+      address: address || 'Unknown Location',  // Ensure address is included in qrData
     });
     
     console.log('Address', address);
@@ -261,6 +270,8 @@ const App = () => {
       return;
     }
   
+   
+    
     const passData = {
       mobileNumber,
       carNumber,
@@ -438,8 +449,9 @@ const App = () => {
                     {issuedBy}
                   </Text>
                   {address && (
+                    
                   <Text style={styles.genText}>
-                    <Text style={{ fontWeight: 'bold' }}>Location:</Text> {address}
+                    <Text style={{ fontWeight: 'bold' ,flexWrap: 'wrap' }}>Location:</Text> {address}
                   </Text>
                 )}
 
@@ -594,10 +606,9 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
   },
   validText: {
-    marginTop: 10,
     fontSize: 16,
     color: '#222',
-    paddingHorizontal: 25,
+    marginLeft:10
   },
   footer: {
     height: 70,

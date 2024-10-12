@@ -321,17 +321,22 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: 'bold',
+    flexWrap: 'wrap'
   },
   value: {
     fontSize: 16,
     marginBottom: 10,
+    flexWrap: 'wrap', // Allow text to wrap onto the next line
+    flexShrink: 1, // Shrink the text if necessary to fit the container
   },
   cardRow: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
     width: '100%',
     marginBottom: 10,
+    //flexWrap: 'wrap', // Allow row contents to wrap onto the next line
   },
+
   validText: {
     color: 'green',
   },

@@ -349,10 +349,8 @@ const App = () => {
   
 
   return (
-    <View>
+    <View style={styles.container}>
     <ScrollView>
-      <SafeAreaView style={styles.container}>
-        {/* Header */}
         
         <View style={styles.header}>
           {/* <TouchableOpacity>
@@ -479,13 +477,13 @@ const App = () => {
         <Button title="Send Pass" onPress={captureQR} color="#57d4e5"/>
         </View>
 
-
+ </ScrollView>
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Powered by Goa Police ©</Text>
         </View>
-               </SafeAreaView>  
-    </ScrollView>
+               
+   
      
       
       </View>
@@ -530,7 +528,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    minHeight: Dimensions.get('window').height,
+    
   },
   logo: {
     width: 80, // Adjust as necessary

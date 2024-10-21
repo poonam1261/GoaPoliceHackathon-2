@@ -143,8 +143,14 @@ const AppPro = () => {
   });
 
   useEffect(() => {
-    console.log('Updated qrData:', qrData); // This should show the latest state
-  }, [qrData]);
+    const getBarCodeScannerPermissions = async () => {
+      const { status } = await BarCodeScanner.requestPermissionsAsync();
+      setHasPermission(status === 'granted');
+    };
+
+    getBarCodeScannerPermissions();
+    startAnimation(); // Start the animation when the component mounts
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -198,9 +204,14 @@ const AppPro = () => {
             <Text style={styles.value}>{qrData?.carNumber || 'N/A'}</Text>
           </View>
           <View style={styles.cardRow}>
-            <Text style={styles.label}>Violation: </Text>
-            <Text style={styles.value}>{qrData?.violation || 'N/A'}</Text>
+          <Text style={styles.label}>Violations: </Text>
+          <Text style={styles.value}>
+            {Array.isArray(qrData.violations) && qrData.violations.length > 0 
+              ? qrData.violations.join(', ') 
+              : 'None'}
+          </Text>
           </View>
+
           <View style={styles.cardRow}>
           <Text style={styles.label}>Location: </Text>
             <Text style={styles.value}>{qrData?.address || 'N/A'}</Text>
@@ -217,7 +228,7 @@ const AppPro = () => {
             <Text style={styles.label}>Valid Until: </Text>
             <Text style={styles.value}> 
               {qrData?.validUntil
-                ? moment(qrData.validUntil).format('YYYY-MM-DD HH:mm:ss')
+                ? moment(qrData.validUntil).format('YYYY-MM-DD , hh:mm:ss A')
                 : 'N/A'}
             </Text>
           </View>

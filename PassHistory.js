@@ -4,6 +4,9 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig'; // Assuming your Firebase configuration is in this file
 import { getAuth } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import moment from 'moment';
+import { Timestamp } from 'firebase/firestore'; // Import Timestamp if needed
+
 
 const PassList = () => {
   const [passList, setPassList] = useState([]);
@@ -63,7 +66,10 @@ const PassList = () => {
             const dateB = new Date(`${b.dateOfIssue} ${b.timeOfIssue}`);
             return dateB - dateA; // Sort in descending order (latest first)
           });
-    
+
+           passArray.reverse();
+           
+          
         console.log('Filtered and sorted passes:', passArray); // Log the filtered and sorted data
     
         setPassList(passArray); // Set the sorted pass data to state
@@ -106,7 +112,10 @@ const PassList = () => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {passList.length > 0 ? (
           passList.map((pass) => (
-            <View key={pass.id} style={styles.card}>
+            <View key={pass.id}
+            style={
+              styles.card}
+          >
               <View style={styles.row}>
                 <Text style={styles.label}>Mobile Number: </Text>
                 <Text style={styles.value}>{pass.mobileNumber || 'N/A'}</Text>
@@ -118,8 +127,17 @@ const PassList = () => {
               </View>
 
               <View style={styles.row}>
-                <Text style={styles.label}>Violation: </Text>
-                <Text style={styles.value}>{pass.violation || 'N/A'}</Text>
+              <Text style={styles.label}>Violations: </Text>
+              <View style={styles.value}>
+  {Array.isArray(pass.violations) && pass.violations.length > 0 
+    ? pass.violations.map((violation, index) => (
+        <Text key={index} style={styles.violationText}>
+          {violation}
+        </Text>
+      ))
+    : <Text>None</Text>
+  }
+</View>
               </View>
 
               <View style={styles.row}>
@@ -145,11 +163,14 @@ const PassList = () => {
               </View>
 
               <View style={styles.row}>
-                <Text style={styles.label}>Valid Until: </Text>
-                <Text style={styles.value}>
-                  {new Date(pass.validUntil).toLocaleString() || 'N/A'}
-                </Text>
-              </View>
+        <Text style={styles.label}>Valid Until: </Text>
+        <Text style={styles.value}>
+          {pass.validUntil instanceof Timestamp 
+            ? moment(pass.validUntil.toDate()).format('YYYY-MM-DD, hh:mm:ss A') // Convert to Date and format
+            : 'N/A'}
+        </Text>
+      </View>
+
             </View>
           ))
         ) : (
@@ -171,6 +192,10 @@ const PassList = () => {
 export default PassList;
 
 const styles = StyleSheet.create({
+  violationText: {
+    fontSize: 16,
+    marginBottom: 4, // Optional: Adds space between each line
+  },
   noPassText: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -190,6 +215,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     marginTop: 15,
+  },
+  validCard: {
+    backgroundColor: 'lightgreen',
+  },
+  invalidCard: {
+    backgroundColor: 'lightcoral',
   },
   scrollContent: {
     paddingHorizontal: 16,

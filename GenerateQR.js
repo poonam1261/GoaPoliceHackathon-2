@@ -12,6 +12,7 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
+import { Checkbox } from 'react-native-paper';
 import QRCode from 'react-native-qrcode-svg';
 import { Picker } from '@react-native-picker/picker';
 import 'react-native-get-random-values';
@@ -25,6 +26,7 @@ import * as SMS from 'expo-sms';
 import { captureRef } from 'react-native-view-shot'; // Import captureRef from react-native-view-shot
 import * as Sharing from 'expo-sharing'; 
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import NetInfo from '@react-native-community/netinfo';  // Import NetInfo for network check
 
 
 const App = () => {
@@ -32,7 +34,7 @@ const App = () => {
   const [carNumber, setCarNumber] = useState('');
   const [qrValue, setQrValue] = useState(null);
   const [validUntil, setValidUntil] = useState(null);
-  const [violation, setViolation] = useState('nil');
+  const [selectedViolations, setSelectedViolations] = useState([]); // Updated
   const [location, setLocation] = useState(null);
   const [isGenerated, setIsGenerated] = useState(false);
   const [issuedBy, setIssuedBy] = useState('');
@@ -40,17 +42,20 @@ const App = () => {
   const [qrCodeUri, setQrCodeUri] = useState(null); 
   const [address, setAddress] = useState(null);
   const [officerName, setOfficerName] = useState('unknown');
+  const [generateBtn, setGenerateBtn] = useState(false);
+  const [validUntilDate,setValidUntilDate] = useState('');
+  const [validUntilTime,setValidUntilTime] = useState('');
+  const [isConnected, setIsConnected] = useState(false); // Add state to track network status
 
 
-  const violations = [
-    'Nil',
+  const violationOptions = [
     'No license',
-    'Expired vehicle reg.',
+    'Expired vehicle reg',
     'No valid insurance',
     'No PUC',
     'Overloading of passengers',
     'Illegal modifications',
-    
+    'Nil',
   ];
 
   const currentDate = new Date();
@@ -144,111 +149,105 @@ const App = () => {
   });
 
   
+  
+  
+  const checkInternetConnection = async () => {
+    const netInfo = await NetInfo.fetch();
+    const hasInternetConnection = netInfo.isConnected && netInfo.isInternetReachable;
+    setIsConnected(hasInternetConnection); // Update state based on network status
+  };
+
 
   useEffect(() => {
-    const requestLocationPermission = async () => {
-      try {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          console.log('Permission to access location was denied');
-          return;
-        }
-    
-        let currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
-    
-        const { latitude, longitude } = currentLocation.coords;
-        setLocation({ latitude, longitude });  // Correctly set both latitude and longitude
-        console.log('Location: ', currentLocation);
-    
-        // Reverse geocoding
-        const place = await Location.reverseGeocodeAsync({ latitude, longitude });
-        if (place.length > 0) {
-          const formattedAddress = `${place[0].name}, ${place[0].city}, ${place[0].region}`;
-          setAddress(formattedAddress);  // Set the address in state
-          console.log('address', formattedAddress);
-        } else {
-          setAddress('Unknown Location');
-        }
-      } catch (error) {
-        console.error('Error fetching location: ', error);
-        setLocation(null);
+    checkInternetConnection();
+    if (isConnected) {
+      requestLocationPermission();
+      fetchUserName();
+    }
+  }, [isConnected]);
+
+  const requestLocationPermission = async () => {
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Permission to access location was denied');
+        return;
       }
-    };
-    
-    
 
-    const checkLocationServices = async () => {
-      const servicesEnabled = await Location.hasServicesEnabledAsync();
-      if (!servicesEnabled) {
-        Alert.alert('Location Services Disabled', 'Please enable location services.');
+      let currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const { latitude, longitude } = currentLocation.coords;
+      setLocation({ latitude, longitude });
+
+      const place = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (place.length > 0) {
+        const formattedAddress = `${place[0].name}, ${place[0].city}, ${place[0].region}`;
+        setAddress(formattedAddress);
+      } else {
+        setAddress('Unknown Location');
       }
-    };    
-    fetchUserName(); 
-    checkLocationServices();
-    requestLocationPermission();
-   
-  }, []);
-
-  const date = moment().format('YYYY-MM-DD');
-  const secretKey = 'hey-you';
-
-  const generateHMACSignature = (data, secretKey) => {
-    return CryptoJS.HmacSHA256(JSON.stringify(data), secretKey).toString();
-  };
-  const generateSalt = () => {
-    return CryptoJS.lib.WordArray.random(16).toString(); // Generate a 16-byte salt
+    } catch (error) {
+      console.error('Error fetching location: ', error);
+      setLocation(null);
+    }
   };
 
-  // Function to encrypt data
-  const encryptData = (data, secretKey) => {
-    const salt = generateSalt(); // Generate a new salt for this encryption
-    const saltedKey = CryptoJS.SHA256(secretKey + salt).toString(); // Combine key with salt
-    const encrypted = CryptoJS.AES.encrypt(
-      JSON.stringify(data),
-      saltedKey,
-    ).toString();
-    return {encryptedData: encrypted, salt}; // Return encrypted data and salt
-  };
   const generatePass = async () => {
     if (!mobileNumber || mobileNumber.length !== 10) {
       Alert.alert('Error', 'Mobile Number must be 10 digits long');
       return;
     }
 
-    if (!address) {
-      try {
-        await requestLocationPermission();  // Wait until the location is fetched
-      } catch (error) {
-        Alert.alert('Error', 'Unable to fetch location. Please try again.');
-        return;  // Exit if location fetch fails
-      }
-    }
-
-    // Ensure the username is fetched before generating the pass
-    await fetchUserName(); // Ensure username is fetched before pass generation
-    
     const now = new Date();
-    const expirationTime = new Date(now.getTime() + 4 * 60 * 60 * 1000); // 4 hours from now
-    setValidUntil(expirationTime); 
+    const expirationTime = new Date(now.getTime() + 4 * 60 * 60 * 1000); 
+
+    setValidUntilDate(expirationTime.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }));
+
+    setValidUntilTime(expirationTime.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hour12: true,
+    }));
+
     const dateOfIssue = now.toISOString();
 
     const qrData = JSON.stringify({
       mobileNumber,
-      carNumber,
-      violation,
+      carNumber: carNumber.toUpperCase(),
+      violations: selectedViolations,
       validUntil: expirationTime.toISOString(),
       dateOfIssue: dateOfIssue,
       issuedBy: issuedBy || null,
-      address: address || 'Unknown Location',  // Ensure address is included in qrData
+      address: address || 'Unknown Location',
     });
-    
-    console.log('Address', address);
-    const {encryptedData, salt} = encryptData(qrData, secretKey);
 
+    const secretKey = 'hey-you';
+    const generateHMACSignature = (data, secretKey) => {
+      return CryptoJS.HmacSHA256(JSON.stringify(data), secretKey).toString();
+    };
+    const generateSalt = () => {
+      return CryptoJS.lib.WordArray.random(16).toString(); 
+    };
+    const encryptData = (data, secretKey) => {
+      const salt = generateSalt();
+      const saltedKey = CryptoJS.SHA256(secretKey + salt).toString(); 
+      const encrypted = CryptoJS.AES.encrypt(
+        JSON.stringify(data),
+        saltedKey,
+      ).toString();
+      return { encryptedData: encrypted, salt };
+    };
+
+    const { encryptedData, salt } = encryptData(qrData, secretKey);
     const hmacSignature = generateHMACSignature(qrData, secretKey);
-    // Encrypt and generate HMAC here...
     const finalQRData = {
       encryptedQRData: encryptedData,
       hmacSignature,
@@ -259,56 +258,54 @@ const App = () => {
     setValidUntil(moment(expirationTime));
     setIsGenerated(true);
 
-    // Store pass information, passing in the necessary values
-    console.log('Issued By Data:', issuedBy);
-    await storePassInformation(dateOfIssue, formattedTime, expirationTime);
-  };
-
-  const storePassInformation = async (dateOfIssue, timeOfIssue, validUntil) => {
-    if (!mobileNumber || !carNumber || !validUntil) {
-      Alert.alert('Error', 'Pass information is incomplete');
-      return;
-    }
-  
-   
-    
-    const passData = {
-      mobileNumber,
-      carNumber,
-      dateOfIssue,
-      timeOfIssue,
-      violation: violation || 'nil',
-      issuedBy: issuedBy || 'unknown',
-      validUntil: validUntil.toISOString(),
-      address : address || null
-     
-    };
-  
-    try {
-     
-      
-  
-      // Fixed line with backticks for template literals
-      const docRef = doc(db, 'Pass', `${mobileNumber}_${carNumber}`);
-      await setDoc(docRef, passData);
-  
-      Alert.alert('Success', 'Pass information stored successfully!');
-  
-      // Send SMS after successful storage, passing the QR code URL
-     // Pass the QR code URL to sendSMS
-    } catch (error) {
-      console.error('Error storing pass information:', error);
-      Alert.alert('Error', 'Failed to store pass information.');
+    if (isConnected) {
+      try {
+        await storePassInformation(dateOfIssue, formattedDate, expirationTime);
+        setGenerateBtn(true);  
+      } catch (error) {
+        Alert.alert('Error', 'Failed to store pass information.');
+      }
+    } else {
+      console.log('Pass generated offline.');
     }
   };
 
-  
-  
+
+const storePassInformation = async (dateOfIssue, timeOfIssue, validUntil) => {
+  if (!mobileNumber || !carNumber || !validUntil) {
+    Alert.alert('Error', 'Pass information is incomplete');
+    return;
+  }
+
+  // Create a timestamp for the pass
+  const passData = {
+    mobileNumber,
+    carNumber,
+    dateOfIssue,
+    timeOfIssue,
+    violations: selectedViolations || 'nil',
+    issuedBy: issuedBy || 'unknown',
+    validUntil,
+    address: address || null,
+    timestamp: new Date() // Store the current date and time
+  };
+
+  try {
+    // Store pass information with a unique document ID
+    const docRef = doc(db, 'Pass', `${dateOfIssue}_${timeOfIssue}_${issuedBy}`);
+    await setDoc(docRef, passData);
+
+    console.log('Success', 'Pass information stored successfully!');
+  } catch (error) {
+    console.error('Error storing pass information:', error);
+    Alert.alert('Error', 'Failed to store pass information.');
+  }
+};  
 
   const resetFields = () => {
     setMobileNumber('');
     setCarNumber('');
-    setViolation('nil');
+    setSelectedViolations([]);
     setQrValue(null);
     setValidUntil(null);
     setIsGenerated(false);
@@ -343,8 +340,16 @@ const App = () => {
     } else {
       console.log('Failed to send SMS.');
     }
+    console.log(validUntil)
   };
-  
+   
+  const toggleViolation = (violation) => {
+    if (selectedViolations.includes(violation)) {
+      setSelectedViolations(selectedViolations.filter(v => v !== violation));
+    } else {
+      setSelectedViolations([...selectedViolations, violation]);
+    }
+  };
   
   
 
@@ -385,38 +390,42 @@ const App = () => {
             editable={!isGenerated}
           />
 
-          <Text style={styles.label}>Violation:</Text>
-          <View
-            style={{
-              borderColor: 'black',
-              borderWidth: 1,
-              borderRadius: 5,
-              backgroundColor: '#f8f8f8',
-            }}>
-            <Picker
-              selectedValue={violation}
-              onValueChange={itemValue => setViolation(itemValue)}
-              style={{color: 'black', height: 50}}
-              enabled={!isGenerated}
-              >
-              {violations.map((violation, index) => (
-                <Picker.Item key={index} label={violation} value={violation} />
-              ))}
-            </Picker>
-          </View>
-
+         
+         
+        <Text Text style={styles.label}>Violations:</Text>
+            {violationOptions.map((violation, index) => (
+             <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 5 }}>
+             <Checkbox
+               status={selectedViolations.includes(violation) ? 'checked' : 'unchecked'}
+               onPress={() => toggleViolation(violation)}
+               disabled = {generateBtn}
+             />
+             <Text>{violation}</Text>
+           </View>
+           
+            ))}
           <View style={styles.buttons}>
           <View style={styles.generateButton}>
-            <Button
-              title="Generate Pass"
-              onPress={generatePass}
-              color="#57d4e5"
-              disabled={isGenerated}
+          <Button
+            title="Generate Pass"
+            onPress={() => {
+              generatePass();
+              
+            }}
+            color="#57d4e5"
+            disabled={isGenerated}
+/>
+            </View>
+            {generateBtn && (
+              <Button 
+              title="Reset" 
+              onPress={() => {
+                resetFields();
+                setGenerateBtn(false);
+              }} 
+              color="#ff6347" 
             />
-            </View>
-            <View style={styles.resetButton}>
-            <Button title="Reset" onPress={resetFields} color="#ff6347" />
-            </View>
+            )}
           </View>
 
           {qrValue && (
@@ -439,9 +448,20 @@ const App = () => {
                     {formattedTime}
                   </Text>
                   <Text style={styles.genText}>
-                    <Text style={{fontWeight: 'bold'}}>Violation:</Text>{' '}
-                    {violation.slice(0, 19)}
-                  </Text>
+                  <Text style={{ fontWeight: 'bold' }}>Violation:</Text>{' '}
+                  {selectedViolations && selectedViolations.length > 0 ? (
+                    selectedViolations.map((violation, index) => (
+                      <Text key={index}>{'\n'}{violation}</Text>
+                    ))
+                  ) : (
+                    'None'
+                  )}
+                </Text>
+
+
+
+
+
                   <Text style={styles.genText}>
                     <Text style={{fontWeight: 'bold'}}>Issued by:</Text>{' '}
                     {issuedBy}
@@ -454,7 +474,7 @@ const App = () => {
                 )}
 
                 </View>
-                <View>
+                <View style={styles.qrView}> 
                   <QRCode
                   
                     value={qrValue}
@@ -466,18 +486,21 @@ const App = () => {
               </View>
 
               <Text style={styles.validText}>
-                <Text  style={{fontWeight: 'bold'}}>Valid until:</Text>{' '}
-                {validUntil?.toLocaleString()}
+              <Text  style={{fontWeight: 'bold'}}>Valid until:</Text>{' '}
+              {validUntilDate}, {validUntilTime}
               </Text>
             </View>
           )}
         </View>
         
-        <View style={styles.sendPass}>
-        <Button title="Send Pass" onPress={captureQR} color="#57d4e5"/>
-        </View>
+        
 
  </ScrollView>
+          {generateBtn && (
+            <View style={styles.sendPass}>
+            <Button title="Send Pass" onPress={captureQR} color="#57d4e5"/>
+            </View>
+          )}
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Powered by Goa Police ©</Text>
@@ -491,6 +514,13 @@ const App = () => {
 };
 
 const styles = StyleSheet.create({
+  
+  qrView:{
+    position:'absolute',
+    right:10,
+    top:30
+    },
+
   buttons:{
     marginTop: 20,
      flex: 1,
@@ -511,7 +541,7 @@ const styles = StyleSheet.create({
     marginRight: 20,
     marginBottom: 10,
    borderRadius:10,
-    overflow:'hidden'
+    overflow:'hidden',
      
   },
   captureQR:{
@@ -609,7 +639,7 @@ const styles = StyleSheet.create({
     marginLeft:10
   },
   footer: {
-    height: 70,
+    height: 50,
     backgroundColor: '#42c5d6',
     justifyContent: 'center',
     
